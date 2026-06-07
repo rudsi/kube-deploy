@@ -40,6 +40,7 @@ func NewServer(deployments *service.DeployService, opts ...Option) *Server {
 // Register wires all API endpoints (Go 1.22+ method-aware patterns).
 func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /healthz", s.healthz)
+	mux.HandleFunc("GET /health", s.healthz) // alias for VIBSL and other PaaS health checks
 	mux.Handle("POST /deploy", s.requireAuth(http.HandlerFunc(s.deploy)))
 	mux.Handle("GET /deployments", s.requireAuth(http.HandlerFunc(s.listDeployments)))
 	mux.Handle("GET /deployments/{id}", s.requireAuth(http.HandlerFunc(s.getDeployment)))

@@ -35,6 +35,9 @@ func (a *Applier) SetRolloutTimeout(timeout time.Duration) {
 
 // Apply creates or updates all resources in the bundle; on failure, attempts best-effort rollback of newly created resources.
 func (a *Applier) Apply(ctx context.Context, bundle *ManifestBundle) error {
+	if a.client == nil {
+		return fmt.Errorf("kubernetes client not configured: set KUBECONFIG_PATH, KUBECONFIG, or run inside a cluster")
+	}
 	// Order matters: namespace and RBAC before workloads; networking after service.
 	steps := []struct {
 		name  string

@@ -23,23 +23,25 @@ func main() {
 	kubeconfig := os.Getenv("KUBECONFIG_PATH")
 
 	clientset, err := k8s.NewClientset(kubeconfig)
+	applier := k8s.NewApplier(clientset)
 	if err != nil {
-		log.Fatalf("kubernetes client: %v", err)
+		log.Printf("warning: kubernetes client unavailable: %v", err)
+		log.Printf("API will start, but POST /deploy returns 502 until cluster credentials are configured")
+		applier = k8s.NewApplier(nil)
 	}
+	applier.SetRolloutTimeout(durationEnv("ROLLOUT_TIMEOUT", 2*time.Minute))
 
 	st := store.New()
-	applier := k8s.NewApplier(clientset)
-	applier.SetRolloutTimeout(durationEnv("ROLLOUT_TIMEOUT", 2*time.Minute))
 	deploySvc := service.NewDeployService(st, applier)
 	server := api.NewServer(deploySvc, api.WithAPIToken(os.Getenv("API_TOKEN")))
 
 	mux := http.NewServeMux()
 	server.Register(mux)
 
-	host := envOrDefault("HOST", "127.0.0.1")
+	host := listenHost()
 	port := envOrDefault("PORT", "8080")
 	if !isLoopbackHost(host) && os.Getenv("API_TOKEN") == "" {
-		log.Fatal("API_TOKEN is required when HOST is not loopback")
+		log.Fatal("API_TOKEN is required when HOST is not loopback (set a secret token in your platform env vars)")
 	}
 
 	addr := net.JoinHostPort(host, port)
@@ -60,6 +62,37 @@ func main() {
 	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// listenHost picks the bind address. Container/PaaS runtimes (VIBSL, etc.) bind 0.0.0.0
+// so platform health checks reach the process; local dev defaults to loopback-only.
+func listenHost() string {
+	if v := os.Getenv("HOST"); v != "" {
+		return v
+	}
+	if isCloudRuntime() {
+		return "0.0.0.0"
+	}
+	return "127.0.0.1"
+}
+
+func isCloudRuntime() bool {
+	for _, key := range []string{
+		"VIBSL_ENVIRONMENT",
+		"VIBSL_APP_ID",
+		"VIBSL_DEPLOYMENT_ID",
+		"WEBSITE_HOSTNAME", // Azure App Service / VIBSL BYOC
+		"RENDER",
+		"FLY_APP_NAME",
+		"K_SERVICE",
+		"DYNO",
+	} {
+		if os.Getenv(key) != "" {
+			return true
+		}
+	}
+	// Platforms inject PORT; local `go run` / `.\bin\kube-deploy.exe` usually does not.
+	return os.Getenv("PORT") != ""
 }
 
 // envOrDefault returns the environment variable value or a fallback when unset.

@@ -341,6 +341,33 @@ kubectl get all -n demo-api
 | Pods not Running | `kubectl describe pods -n demo-api` — image must work non-root (e.g. nginx-unprivileged). |
 | API returns 401 | `API_TOKEN` is set; include `Authorization: Bearer <token>`. |
 | API deploy 502 | API needs valid kubeconfig; cluster must exist (`kind export kubeconfig`). |
+| VIBSL deploy exits on startup | Set `API_TOKEN` in VIBSL env vars; set health check path to `/health`. Provide kubeconfig for `/deploy`. |
+
+---
+
+## Deploy on VIBSL
+
+[VIBSL](https://vibsl.com) auto-detects Go, builds a container, and probes **`GET /health`** on port **8080**. This repo exposes `/health` (and `/healthz`) for that check.
+
+Set these **environment variables** in the VIBSL dashboard (do not commit secrets to git — VIBSL scans for leaked credentials):
+
+| Variable | Required | Example |
+|----------|----------|---------|
+| `API_TOKEN` | **Yes** | `my-secure-random-token` |
+| `KUBECONFIG_PATH` | For `/deploy` | Path to mounted kubeconfig in the container |
+| `HOST` | No | Auto `0.0.0.0` when VIBSL sets `PORT` |
+| `PORT` | No | Set automatically by VIBSL (default `8080`) |
+
+The API **starts without a Kubernetes cluster** (health check passes). `POST /deploy` returns **502** until valid cluster credentials are configured (`KUBECONFIG_PATH`, `KUBECONFIG`, or in-cluster config when running inside Kubernetes).
+
+Example request after deploy:
+
+```bash
+curl -X POST https://your-app.vibsl.app/deploy \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer my-secure-random-token" \
+  -d "@examples/deploy-request.json"
+```
 
 ---
 
@@ -349,6 +376,7 @@ kubectl get all -n demo-api
 | Method | Path |
 |--------|------|
 | `GET` | `/healthz` |
+| `GET` | `/health` (alias for PaaS health checks) |
 | `POST` | `/deploy` |
 | `GET` | `/deployments` |
 | `GET` | `/deployments/{id}` |

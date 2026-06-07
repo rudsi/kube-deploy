@@ -25,6 +25,13 @@ func TestProtectedEndpointsRequireBearerToken(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /healthz status = %d, want %d", rr.Code, http.StatusOK)
 	}
+
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/health", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /health status = %d, want %d", rr.Code, http.StatusOK)
+	}
 }
 
 func TestDeployRejectsOversizedBody(t *testing.T) {
