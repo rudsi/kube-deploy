@@ -1,0 +1,19 @@
+{
+  "appName": "demo-api",
+  "namespace": "demo-api",
+  "image": "ghcr.io/nginxinc/nginx-unprivileged:1.27",
+  "port": 8080,
+  "replicas": 2,
+  "probePath": "/",
+  "ingressClassName": "nginx",
+  "env": {
+    "LOG_LEVEL": "info"
+  },
+  "configData": {
+    "FEATURE_FLAG": "on"
+  },
+  "cpuRequest": "100m",
+  "cpuLimit": "500m",
+  "memoryRequest": "128Mi",
+  "memoryLimit": "256Mi"
+}
