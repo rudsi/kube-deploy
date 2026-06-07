@@ -56,8 +56,10 @@ func main() {
 
 	log.Printf("kube-deploy API listening on http://%s", addr)
 	log.Printf("using kubeconfig: %s", kubeconfigDisplay(kubeconfig))
-	if os.Getenv("API_TOKEN") == "" {
+	if token := os.Getenv("API_TOKEN"); token == "" {
 		log.Printf("API_TOKEN not set; API auth is disabled for loopback-only development")
+	} else {
+		log.Printf("API_TOKEN is set; protected endpoints require Authorization: Bearer <token>")
 	}
 	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)
@@ -90,6 +92,10 @@ func isCloudRuntime() bool {
 		if os.Getenv(key) != "" {
 			return true
 		}
+	}
+	// VIBSL and similar platforms run inside a container even when PORT is unset at boot.
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
 	}
 	// Platforms inject PORT; local `go run` / `.\bin\kube-deploy.exe` usually does not.
 	return os.Getenv("PORT") != ""
