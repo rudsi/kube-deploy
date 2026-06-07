@@ -353,12 +353,23 @@ Set these **environment variables** in the VIBSL dashboard (do not commit secret
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `API_TOKEN` | **Yes** | `my-secure-random-token` |
-| `KUBECONFIG_PATH` | For `/deploy` | Path to mounted kubeconfig in the container |
-| `HOST` | No | Auto `0.0.0.0` when VIBSL sets `PORT` |
+| `API_TOKEN` | **Yes** | `dev-token` (testing) |
+| `HOST` | No | Auto `0.0.0.0` in containers |
 | `PORT` | No | Set automatically by VIBSL (default `8080`) |
+| `KUBECONFIG_PATH` | For `/deploy` | Path to mounted kubeconfig in the container |
+| `API_TOKEN_FILE` | Alternative to `API_TOKEN` | Path to a mounted secret file |
 
-The API **starts without a Kubernetes cluster** (health check passes). `POST /deploy` returns **502** until valid cluster credentials are configured (`KUBECONFIG_PATH`, `KUBECONFIG`, or in-cluster config when running inside Kubernetes).
+See `.env.example` for the exact variable names to copy into VIBSL.
+
+The API **starts without a Kubernetes cluster** (health check passes). If `API_TOKEN` is missing, `/health` still works but `/deploy` returns **503** (not a crash). `POST /deploy` returns **502** until valid cluster credentials are configured.
+
+After deploy, check logs for this line:
+
+```text
+startup: env HOST="..." PORT="..." | bind=0.0.0.0:8080 ... | API_TOKEN configured=true
+```
+
+If `API_TOKEN configured=false` after you set it in VIBSL, the platform is not injecting env vars — re-save variables, redeploy, or use **Secrets / mounted files** with `API_TOKEN_FILE`.
 
 Example request after deploy:
 

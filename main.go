@@ -33,16 +33,19 @@ func main() {
 
 	st := store.New()
 	deploySvc := service.NewDeployService(st, applier)
-	server := api.NewServer(deploySvc, api.WithAPIToken(os.Getenv("API_TOKEN")))
-
-	mux := http.NewServeMux()
-	server.Register(mux)
 
 	host := listenHost()
 	port := envOrDefault("PORT", "8080")
-	if !isLoopbackHost(host) && os.Getenv("API_TOKEN") == "" {
-		log.Fatal("API_TOKEN is required when HOST is not loopback (set a secret token in your platform env vars)")
-	}
+	apiToken := resolveAPIToken()
+	authEnforced := !isLoopbackHost(host)
+
+	server := api.NewServer(deploySvc,
+		api.WithAPIToken(apiToken),
+		api.WithAuthEnforced(authEnforced),
+	)
+
+	mux := http.NewServeMux()
+	server.Register(mux)
 
 	addr := net.JoinHostPort(host, port)
 	httpServer := &http.Server{
@@ -54,12 +57,16 @@ func main() {
 		IdleTimeout:       2 * time.Minute,
 	}
 
+	logStartupConfig(host, port, apiToken)
 	log.Printf("kube-deploy API listening on http://%s", addr)
 	log.Printf("using kubeconfig: %s", kubeconfigDisplay(kubeconfig))
-	if token := os.Getenv("API_TOKEN"); token == "" {
+	switch {
+	case apiToken != "":
+		log.Printf("API auth enabled; use Authorization: Bearer <token> on protected routes")
+	case authEnforced:
+		log.Printf("warning: API_TOKEN not configured; /health works but /deploy and /deployments return 503 until set")
+	default:
 		log.Printf("API_TOKEN not set; API auth is disabled for loopback-only development")
-	} else {
-		log.Printf("API_TOKEN is set; protected endpoints require Authorization: Bearer <token>")
 	}
 	if err := httpServer.ListenAndServe(); err != nil {
 		log.Fatal(err)

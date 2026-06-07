@@ -34,6 +34,26 @@ func TestProtectedEndpointsRequireBearerToken(t *testing.T) {
 	}
 }
 
+func TestProtectedEndpointsReturn503WhenAuthEnforcedWithoutToken(t *testing.T) {
+	server := NewServer(nil, WithAuthEnforced(true))
+	mux := http.NewServeMux()
+	server.Register(mux)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/deployments", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("GET /deployments status = %d, want %d", rr.Code, http.StatusServiceUnavailable)
+	}
+
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/health", nil)
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /health status = %d, want %d", rr.Code, http.StatusOK)
+	}
+}
+
 func TestDeployRejectsOversizedBody(t *testing.T) {
 	server := NewServer(nil)
 	mux := http.NewServeMux()

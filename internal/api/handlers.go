@@ -14,8 +14,9 @@ import (
 
 // Server registers routes on a ServeMux and delegates to DeployService.
 type Server struct {
-	deployments *service.DeployService
-	apiToken    string
+	deployments  *service.DeployService
+	apiToken     string
+	authEnforced bool
 }
 
 // Option customizes the API server.
@@ -25,6 +26,13 @@ type Option func(*Server)
 func WithAPIToken(token string) Option {
 	return func(s *Server) {
 		s.apiToken = strings.TrimSpace(token)
+	}
+}
+
+// WithAuthEnforced blocks protected endpoints when no token is configured (cloud deploys).
+func WithAuthEnforced(enforced bool) Option {
+	return func(s *Server) {
+		s.authEnforced = enforced
 	}
 }
 
@@ -108,6 +116,13 @@ func MapValidationError(err error) error {
 
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	if s.apiToken == "" {
+		if s.authEnforced {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				writeJSON(w, http.StatusServiceUnavailable, model.ErrorResponse{
+					Error: "API_TOKEN is not configured; add it in your platform environment variables and redeploy",
+				})
+			})
+		}
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
