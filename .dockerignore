@@ -1,0 +1,6 @@
+bin/
+.git/
+.vscode/
+screenshots/
+*.exe
+*.test
